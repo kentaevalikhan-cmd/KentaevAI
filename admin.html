@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark"><title>KentaevAI · Админ</title>
+<style>
+:root{--bg:#000;--fg:#f4f4f4;--mute:rgba(244,244,244,.55);--line:rgba(255,255,255,.14)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;padding:max(20px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto}h1{font:400 30px Georgia,serif;margin:8px 0 18px}
+input,button{font:inherit;border-radius:12px;border:1px solid var(--line);background:#0c0c0c;color:var(--fg);padding:12px 14px;width:100%;margin:6px 0}
+button{cursor:pointer;background:#fff;color:#000;font-weight:600}button.g{background:#0c0c0c;color:var(--fg);width:auto;padding:7px 12px;margin:0 0 0 6px;font-weight:500}
+.m{color:var(--mute);font-size:13px;word-break:break-all}.e{color:#ff9a8b}.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.row b{display:block;word-break:break-all}.ban{opacity:.5}code{display:block;background:#0c0c0c;border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;word-break:break-all;user-select:all}
+</style></head><body><main>
+<h1>Админка</h1>
+<form id="lf" autocomplete="on">
+ <input id="em" type="email" placeholder="Email админа" autocomplete="username" required>
+ <input id="pw" type="password" placeholder="Пароль" autocomplete="current-password" required>
+ <div id="cw" hidden><div id="sp" class="m"></div><input id="cd" inputmode="numeric" maxlength="7" placeholder="Код из приложения (6 цифр)" autocomplete="one-time-code"></div>
+ <button id="go">Войти</button><div id="msg" class="m e"></div>
+</form>
+<section id="pn" hidden><div class="m" id="who"></div><div id="ls"></div><button class="g" id="out" style="margin:16px 0 0">Выйти</button></section>
+</main><script>
+var $=function(i){return document.getElementById(i);};
+async function api(a){try{var r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(a)});var d=await r.json().catch(function(){return{};});d.s=r.status;return d;}catch(_){return{error:'net'};}}
+var ER={bad:'Неверный email или пароль.',code:'Неверный код.',locked:'Слишком много попыток. Подожди 15 минут.',net:'Нет связи с сервером.',server:'Ошибка сервера: проверь хранилище и переменные на Vercel.'};
+function say(t){$('msg').textContent=t||'';}
+function show(p){$('lf').hidden=p;$('pn').hidden=!p;if(p)load();}
+async function load(){var d=await api({action:'admin_list'});if(!d.users){show(false);return;}var ls=$('ls');ls.textContent='';$('who').textContent='Пользователей: '+d.users.length;
+ d.users.forEach(function(u){var r=document.createElement('div');r.className='row'+(u.banned?' ban':'');var i=document.createElement('div'),b=document.createElement('b'),m=document.createElement('span');
+  b.textContent=u.name+(u.admin?' · админ':'')+(u.banned?' · заблокирован':'');m.className='m';m.textContent=u.email+(u.t?' · '+new Date(u.t).toLocaleDateString('ru-RU'):'');i.append(b,m);r.append(i);
+  if(!u.admin){var x=document.createElement('div'),a=document.createElement('button'),z=document.createElement('button');a.className=z.className='g';a.textContent=u.banned?'Разбан':'Бан';z.textContent='Удалить';
+   a.onclick=async function(){await api({action:'admin_ban',email:u.email,banned:!u.banned});load();};
+   z.onclick=async function(){if(confirm('Удалить '+u.email+' навсегда?')){await api({action:'admin_delete',email:u.email});load();}};x.append(a,z);r.append(x);}
+  ls.append(r);});}
+$('lf').onsubmit=async function(e){e.preventDefault();say('');$('go').disabled=true;
+ var d=await api({action:'admin_login',email:$('em').value,password:$('pw').value,code:$('cd').value});$('go').disabled=false;
+ if(d.ok){$('pw').value=$('cd').value='';show(true);return;}
+ if(d.setup){$('cw').hidden=false;$('sp').innerHTML='';var t=document.createElement('div'),c=document.createElement('code'),l=document.createElement('a');
+  t.textContent='Первый вход. Добавь ключ в Google Authenticator или Authy (ввод вручную, тип «по времени») и введи код:';c.textContent=d.setup.secret;
+  if(/^otpauth:\/\//.test(d.setup.uri)){l.href=d.setup.uri;l.textContent='Открыть в приложении';l.style.color='#fff';}$('sp').append(t,c,l);$('cd').focus();return;}
+ if(d.need){$('cw').hidden=false;$('sp').textContent='Введи код из приложения-аутентификатора.';$('cd').focus();return;}
+ say(ER[d.error]||'Не удалось войти.');};
+$('out').onclick=async function(){await api({action:'logout'});show(false);};
+api({action:'me'}).then(function(d){if(d.user&&d.user.admin)show(true);});
+</script></body></html>
